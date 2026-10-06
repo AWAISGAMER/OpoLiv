@@ -1,0 +1,54 @@
+name: Unzip and Build APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # Direct Unzip commands
+    - name: Unzip Files
+      run: |
+        unzip -o *.zip || true
+        find . -name "*.zip" -exec unzip -o {} \; || true
+        ls -la
+
+    # Setup Java
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    # Setup Flutter
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        channel: 'stable'
+
+    # Run build inside extracted directory
+    - name: Get Dependencies and Build
+      run: |
+        if [ -f "pubspec.yaml" ]; then
+          flutter pub get
+          flutter build apk --release --no-tree-shake-icons
+        else
+          DIR=$(find . -name "pubspec.yaml" -exec dirname {} \;)
+          cd $DIR
+          flutter pub get
+          flutter build apk --release --no-tree-shake-icons
+          cp build/app/outputs/flutter-apk/app-release.apk $GITHUB_WORKSPACE/
+        fi
+
+    # Upload Artifact
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: OpoLive-Release-APK
+        path: "**/app-release.apk"
